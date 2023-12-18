@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-ish Time Adherence (RTA)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .user-container {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-top: 20px;
+      width: 60%;
+    }
+
+    #userForm {
+      border: 1px solid black;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      border: 1px solid black;
+      padding: 10px;
+    }
+
+    .green-light, .gold-light {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      margin-right: 5px;
+      display: inline-block;
+    }
+
+    .counter {
+      font-size: 1.5em;
+      margin-right: 20px;
+    }
+
+    .status {
+      font-size: 1em;
+      margin-bottom: 5px;
+      margin-right: 20px;
+    }
+
+    .action-button {
+      font-size: 1em;
+      margin-top: 5px;
+      margin-right: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .chat-container {
+      width: 30%;
+      height: 400px;
+      overflow: auto;
+      border: 1px solid black;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .chat-input {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .send-button {
+      margin-top: 10px;
+    }
+
+    .underline {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="user-container">
+    <!-- User form will be displayed here -->
+    <div id="userForm">
+      <label for="username">Enter Username:</label>
+      <input type="text" id="username" placeholder="Username">
+      <button onclick="addUser()">Add User</button>
+    </div>
+
+    <!-- User list will be displayed here -->
+    <div id="userList"></div>
+  </div>
+
+  <div class="chat-container" id="chatContainer">
+    <!-- Chat messages will be displayed here -->
+    <input type="text" class="chat-input" id="messageInput" placeholder="Type your message...">
+    <button onclick="sendMessage()" class="send-button">Send Message</button>
+  </div>
+
+  <script>
+    let users = [];
+    let chatMessages = [];
+
+    function addUser() {
+      const usernameInput = document.getElementById('username');
+      const username = usernameInput.value.trim();
+
+      if (username !== '' && !users.find(user => user.username === username) && username.toLowerCase() !== 'batman') {
+        const newUser = {
+          username: username,
+          counter: 0,
+          timer: null,
+          status: '',
+          led: document.createElement('div'),
+          goldLed: document.createElement('div'),
+        };
+
+        newUser.led.classList.add('green-light');
+        newUser.goldLed.classList.add('gold-light');
+        document.getElementById('userList').appendChild(newUser.led);
+        document.getElementById('userList').appendChild(newUser.goldLed);
+
+        users.push(newUser);
+        displayUsers();
+        usernameInput.value = ''; // Clear the input field
+      } else {
+        alert("Please enter a username (e.g., Batman). Batman doesn't work here.");
+      }
+    }
+
+    function displayUsers() {
+      const userListContainer = document.getElementById('userList');
+      userListContainer.innerHTML = ''; // Clear the existing list
+
+      users.sort((a, b) => b.counter - a.counter); // Sort users by waiting time
+
+      users.forEach((user, index) => {
+        const userBox = document.createElement('div');
+        userBox.classList.add('user-info');
+
+        const userDetailsContainer = document.createElement('div');
+        userDetailsContainer.classList.add('user-details');
+
+        const usernameLabel = document.createElement('label');
+        usernameLabel.textContent = `User: ${user.username}`;
+        if (index === 0) {
+          usernameLabel.classList.add('underline');
+        }
+
+        const counterLabel = document.createElement('p');
+        counterLabel.classList.add('counter');
+        counterLabel.textContent = `Waiting: ${formatTime(user.counter)}`;
+
+        const statusLabel = document.createElement('p');
+        statusLabel.classList.add('status');
+        statusLabel.textContent = `Status: ${user.status}`;
+
+        const startButton = createButton('Start', () => startTimer(user));
+        const pauseButton = createButton('Pause', () => pauseTimer(user));
+        const adjustButton = createButton('Adjust Timer', () => adjustTimer(user));
+        const resetButton = createButton('Reset', () => resetCounter(user));
+        const removeButton = createButton('Remove', () => removeUser(user));
+        const setStatusButton = createButton('Set Status', () => setStatus(user));
+
+        userDetailsContainer.appendChild(user.led);
+        userDetailsContainer.appendChild(user.goldLed);
+        userDetailsContainer.appendChild(usernameLabel);
+        userDetailsContainer.appendChild(statusLabel);
+        userDetailsContainer.appendChild(counterLabel);
+
+        userBox.appendChild(startButton);
+        userBox.appendChild(pauseButton);
+        userBox.appendChild(adjustButton);
+        userBox.appendChild(resetButton);
+        userBox.appendChild(removeButton);
+        userBox.appendChild(setStatusButton);
+        userBox.appendChild(userDetailsContainer);
+
+        userListContainer.appendChild(userBox);
+      });
+    }
+
+    function createButton(text, clickHandler) {
+      const button = document.createElement('button');
+      button.classList.add('action-button');
+      button.textContent = text;
+      button.onclick = clickHandler;
+      return button;
+    }
+
+    function startTimer(user) {
+      if (user.timer === null) {
+        user.led.style.backgroundColor = 'green';
+        user.timer = setInterval(() => {
+          user.counter++;
+          displayUsers();
+        }, 1000); // Increment every second
+      }
+    }
+
+    function pauseTimer(user) {
+      if (user.timer !== null) {
+        user.led.style.backgroundColor = 'red';
+        clearInterval(user.timer);
+        user.timer = null;
+        displayUsers();
+      }
+    }
+
+    function resetCounter(user) {
+      user.counter = 0;
+      displayUsers();
+    }
+
+    function removeUser(user) {
+      users = users.filter(u => u !== user);
+      displayUsers();
+    }
+
+    function setStatus(user) {
+      const newStatus = prompt('Enter your status:');
+      if (newStatus !== null) {
+        user.status = newStatus;
+        displayUsers();
+      }
+    }
+
+    function adjustTimer(user) {
+      const newCounter = prompt('Adjust your timer (in seconds):');
+      const parsedCounter = parseInt(newCounter, 10);
+
+      if (!isNaN(parsedCounter)) {
+        user.counter = parsedCounter;
+        displayUsers();
+      }
+    }
+
+    function formatTime(seconds) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+    }
+
+    function addChatMessage(username, message) {
+      const chatContainer = document.getElementById('chatContainer');
+      const messageDiv = document.createElement('div');
+      messageDiv.textContent = `${username}: ${message}`;
+      chatContainer.appendChild(messageDiv);
+
+      // Scroll to the bottom to show the latest message
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function sendMessage() {
+      const usernameInput = prompt('Enter your username:');
+      const messageInput = document.getElementById('messageInput').value;
+      if (usernameInput && messageInput.trim() !== '') {
+        addChatMessage(usernameInput, messageInput);
+        // Clear the message input after sending
+        document.getElementById('messageInput').value = '';
+      }
+    }
+  </script>
+
+  <div>Created by Kylan B. &lt;3</div>
+</body>
+</html>
